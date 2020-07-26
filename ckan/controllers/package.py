@@ -203,6 +203,28 @@ class PackageController(base.BaseController):
         c.search_url_params = urlencode(_encode_params(params_nopage))
 
         try:
+            facets = OrderedDict()
+
+            default_facet_titles = {
+                'organization': _('Organizations'),
+                'groups': _('Groups'),
+                'tags': _('Tags'),
+                'res_format': _('Formats'),
+                'license_id': _('Licenses'),
+            }
+
+            for facet in h.facets():
+                if facet in default_facet_titles:
+                    facets[facet] = default_facet_titles[facet]
+                else:
+                    facets[facet] = facet
+
+            # Facet titles
+            for plugin in p.PluginImplementations(p.IFacets):
+                facets = plugin.dataset_facets(facets, package_type)
+
+            c.facet_titles = facets
+
             c.fields = []
             # c.fields_grouped will contain a dict of params containing
             # a list of values eg {'tags':['tag1', 'tag2']}
@@ -212,7 +234,7 @@ class PackageController(base.BaseController):
             for (param, value) in request.params.items():
                 if param not in ['q', 'page', 'sort'] \
                         and len(value) and not param.startswith('_'):
-                    if not param.startswith('ext_'):
+                    if not param.startswith('ext_') and param in facets:
                         c.fields.append((param, value))
                         fq += ' %s:"%s"' % (param, value)
                         if param not in c.fields_grouped:
@@ -249,28 +271,6 @@ class PackageController(base.BaseController):
             if not search_all or package_type != search_all_type:
                 # Only show datasets of this particular type
                 fq += ' +dataset_type:{type}'.format(type=package_type)
-
-            facets = OrderedDict()
-
-            default_facet_titles = {
-                'organization': _('Organizations'),
-                'groups': _('Groups'),
-                'tags': _('Tags'),
-                'res_format': _('Formats'),
-                'license_id': _('Licenses'),
-                }
-
-            for facet in h.facets():
-                if facet in default_facet_titles:
-                    facets[facet] = default_facet_titles[facet]
-                else:
-                    facets[facet] = facet
-
-            # Facet titles
-            for plugin in p.PluginImplementations(p.IFacets):
-                facets = plugin.dataset_facets(facets, package_type)
-
-            c.facet_titles = facets
 
             data_dict = {
                 'q': q,
